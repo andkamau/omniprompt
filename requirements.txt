@@ -1,0 +1,6 @@
+PyYAML
+google-generativeai
+openai
+anthropic
+groq
+dashscope

@@ -1,0 +1,26 @@
+# OmniPrompt API Keys
+# For each service, replace "YOUR_API_KEY_HERE" with your actual key.
+
+google:
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://aistudio.google.com/app/apikey"
+
+openai:
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://platform.openai.com/api-keys"
+
+anthropic:
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://console.anthropic.com/settings/keys"
+
+groq:
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://console.groq.com/keys"
+
+moonshot: # Kimi
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://platform.moonshot.cn/console/api-keys"
+
+alibaba: # Qwen
+  api_key: "YOUR_API_KEY_HERE"
+  api_key_url: "https://dashscope.console.aliyun.com/apiKey"
