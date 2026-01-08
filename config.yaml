@@ -1,26 +1,31 @@
-# OmniPrompt API Keys
-# For each service, replace "YOUR_API_KEY_HERE" with your actual key.
+# OmniPrompt Configuration
+#
+# For each provider, set the environment variable named in the 'api_key_env' field.
+# This file tells the script WHICH environment variable to read for each provider's key.
+#
+# Example: For google, set an environment variable named GOOGLE_API_KEY.
+# export GOOGLE_API_KEY="your-actual-api-key"
 
 google:
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "GOOGLE_API_KEY"
   api_key_url: "https://aistudio.google.com/app/apikey"
 
 openai:
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "OPENAI_API_KEY"
   api_key_url: "https://platform.openai.com/api-keys"
 
 anthropic:
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "ANTHROPIC_API_KEY"
   api_key_url: "https://console.anthropic.com/settings/keys"
 
 groq:
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "GROQ_API_KEY"
   api_key_url: "https://console.groq.com/keys"
 
 moonshot: # Kimi
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "MOONSHOT_API_KEY"
   api_key_url: "https://platform.moonshot.cn/console/api-keys"
 
 alibaba: # Qwen
-  api_key: "YOUR_API_KEY_HERE"
+  api_key_env: "ALIBABA_API_KEY"
   api_key_url: "https://dashscope.console.aliyun.com/apiKey"
