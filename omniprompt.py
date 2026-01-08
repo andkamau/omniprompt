@@ -8,6 +8,12 @@ large language model (LLM) APIs from different providers.
 import argparse
 import yaml
 import os
+import time
+import random
+import base64
+import requests
+import concurrent.futures
+from datetime import datetime
 from pathlib import Path
 
 # Import provider-specific libraries
@@ -16,6 +22,28 @@ from openai import OpenAI
 from anthropic import Anthropic
 from groq import Groq
 import dashscope
+
+# Import Rich for UI
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.live import Live
+from rich.text import Text
+
+# --- Constants ---
+GENERATED_IMAGES_DIR = Path("generated_images")
+
+FUN_CAPTIONS = [
+    "Convincing the pixels to cooperate...",
+    "Mixing red, green, and blue in a cauldron...",
+    "Consulting the oracle of aesthetics...",
+    "Teaching the AI art history in 5 seconds...",
+    "Dreaming in electric sheep...",
+    "Summoning the muse from the cloud...",
+    "Applying virtual paint to digital canvas...",
+    "Negotiating with the GPU...",
+    "Connecting the dots... all million of them...",
+    "Polishing the pixels...",
+]
 
 # --- Configuration ---
 
@@ -56,6 +84,55 @@ def get_api_key(provider, config):
     api_key = os.getenv(env_var_name)
     return api_key, env_var_name
 
+# --- Helper Functions ---
+
+def get_fun_caption():
+    """Returns a random fun caption."""
+    return random.choice(FUN_CAPTIONS)
+
+def save_image(data, provider, prompt, extension="png"):
+    """
+    Saves image data (bytes) to the generated_images directory.
+    """
+    GENERATED_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Create a filename based on timestamp and prompt (sanitized)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    sanitized_prompt = "".join(x for x in prompt if x.isalnum() or x in " -_")[:50].strip().replace(" ", "_")
+    filename = f"{provider}_{timestamp}_{sanitized_prompt}.{extension}"
+    filepath = GENERATED_IMAGES_DIR / filename
+    
+    with open(filepath, "wb") as f:
+        f.write(data)
+    
+    return filepath
+
+def download_image(url):
+    """Downloads an image from a URL."""
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.content
+
+def run_with_dynamic_captions(console, action, *args, **kwargs):
+    """Runs an action in a separate thread while updating captions."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold green]{task.description}"),
+        transient=True,
+        console=console
+    ) as progress:
+        task = progress.add_task(get_fun_caption(), total=None)
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(action, *args, **kwargs)
+            
+            while not future.done():
+                time.sleep(2.0) # Change caption every 2 seconds
+                if not future.done():
+                    progress.update(task, description=get_fun_caption())
+            
+            return future.result()
+
 # --- Provider API Functions ---
 # (No changes needed in these functions)
 def query_google(api_key, model, prompt):
@@ -70,15 +147,81 @@ def query_google(api_key, model, prompt):
 
 def generate_google_image(api_key, model, prompt):
     """Generates an image using the Google Imagen model."""
+    console = Console()
     try:
         genai.configure(api_key=api_key)
-        model_instance = genai.GenerativeModel(model)
-        response = model_instance.generate_content(prompt)
-        print(f"--- Image generation task from google/{model} ---")
-        print("NOTE: This is a placeholder for actual image file handling.")
-        print(f"Response received for prompt: '{prompt}'\n")
+        
+        def _call_google():
+            model_instance = genai.GenerativeModel(model)
+            return model_instance.generate_content(prompt)
+
+        response = run_with_dynamic_captions(console, _call_google)
+        
+        # Check response for images
+        if hasattr(response, 'parts'):
+            for part in response.parts:
+                # Check for inline_data (common in newer Gemini SDKs for images)
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    if hasattr(part.inline_data, 'mime_type') and part.inline_data.mime_type.startswith('image/'):
+                        filepath = save_image(part.inline_data.data, 'google', prompt)
+                        console.print(f"[bold green]Image generated successfully![/bold green]")
+                        console.print(f"Saved to: [bold]{filepath}[/bold]")
+                        return
+
+                # Check for direct mime_type/blob (older/vertex SDKs sometimes)
+                elif hasattr(part, 'mime_type') and part.mime_type.startswith('image/'):
+                    # It's an image!
+                    filepath = save_image(part.blob, 'google', prompt)
+                    console.print(f"[bold green]Image generated successfully![/bold green]")
+                    console.print(f"Saved to: [bold]{filepath}[/bold]")
+                    return
+        
+        # Fallback/Placeholder
+        console.print(f"--- Response from google/{model} ---")
+        console.print("Raw response received. Could not automatically extract image.")
+        # Only print text if it looks like text, to avoid errors with inline_data
+        try:
+             if response.text:
+                console.print(response.text)
+        except Exception:
+             console.print("[It seems the response contains non-text data that the CLI could not extract]")
+
     except Exception as e:
-        print(f"--- Error from google/{model} ---\nAn error occurred: {e}\n")
+        console.print(f"[bold red]--- Error from google/{model} ---[/bold red]")
+        console.print(f"An error occurred: {e}\n")
+
+def generate_openai_image(api_key, model, prompt):
+    """Generates an image using OpenAI's DALL-E."""
+    console = Console()
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        def _call_openai():
+            return client.images.generate(
+                model=model,
+                prompt=prompt,
+                n=1,
+                size="1024x1024"
+            )
+
+        response = run_with_dynamic_captions(console, _call_openai)
+        
+        image_url = response.data[0].url
+        
+        # We can also wrap the download with a simpler spinner or just print
+        with Progress(SpinnerColumn(), TextColumn("[bold green]Downloading image..."), transient=True, console=console) as dl_progress:
+            dl_progress.add_task("Download", total=None)
+            image_data = download_image(image_url)
+        
+        filepath = save_image(image_data, 'openai', prompt, extension="png")
+            
+        console.print(f"[bold green]Image generated successfully![/bold green]")
+        console.print(f"Saved to: [bold]{filepath}[/bold]")
+            
+    except Exception as e:
+        console.print(f"[bold red]--- Error from openai/{model} ---[/bold red]")
+        console.print(f"An error occurred: {e}\n")
+
 
 def query_openai_compatible(api_key, model, prompt, provider_name, base_url=None):
     """Sends a prompt to an OpenAI-compatible API."""
@@ -223,8 +366,32 @@ def main():
 
     # --- Handle Image Generation ---
     if args.generate_image:
-        # ... (This can be implemented similarly)
-        print("The --generate-image feature is not yet fully refactored.")
+        # Default to OpenAI if no provider specified, or use specified provider
+        provider = args.provider if args.provider else 'openai'
+        # Default models
+        model = args.model
+        if not model:
+            if provider == 'openai':
+                model = 'dall-e-3'
+            elif provider == 'google':
+                model = 'gemini-3-pro-image-preview'
+        
+        api_key, env_var_name = get_api_key(provider, config)
+        
+        if not env_var_name:
+             print(f"Error: Provider '{provider}' not found or 'api_key_env' not set in config.yaml.")
+             return
+
+        if not api_key:
+            print(f"Error: API key for '{provider}' not found. Please set the '{env_var_name}' environment variable.")
+            return
+
+        if provider == 'openai':
+            generate_openai_image(api_key, model, args.generate_image)
+        elif provider == 'google':
+            generate_google_image(api_key, model, args.generate_image)
+        else:
+            print(f"Error: Image generation not supported for provider '{provider}'.")
         return
 
     # --- Handle Standard Query ---
