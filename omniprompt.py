@@ -133,177 +133,218 @@ def run_with_dynamic_captions(console, action, *args, **kwargs):
             
             return future.result()
 
-# --- Provider API Functions ---
-# (No changes needed in these functions)
-def query_google(api_key, model, prompt):
-    """Sends a prompt to the Google Gemini API."""
-    try:
-        genai.configure(api_key=api_key)
-        model_instance = genai.GenerativeModel(model)
-        response = model_instance.generate_content(prompt)
-        print(f"--- Response from google/{model} ---\n{response.text}\n")
-    except Exception as e:
-        print(f"--- Error from google/{model} ---\nAn error occurred: {e}\n")
+# --- Provider Classes ---
 
-def generate_google_image(api_key, model, prompt):
-    """Generates an image using the Google Imagen model."""
-    console = Console()
-    try:
-        genai.configure(api_key=api_key)
-        
-        def _call_google():
+from abc import ABC, abstractmethod
+
+class LLMProvider(ABC):
+    def __init__(self, api_key, provider_name, base_url=None):
+        self.api_key = api_key
+        self.provider_name = provider_name
+        self.base_url = base_url
+
+    @abstractmethod
+    def generate_text(self, model, prompt):
+        pass
+
+    def generate_image(self, model, prompt):
+        print(f"Error: Image generation not supported for provider '{self.provider_name}'.")
+
+    def list_models(self):
+        print(f"Error: Listing models not supported for provider '{self.provider_name}'.")
+
+class GoogleProvider(LLMProvider):
+    def __init__(self, api_key):
+        super().__init__(api_key, 'google')
+
+    def generate_text(self, model, prompt):
+        try:
+            genai.configure(api_key=self.api_key)
             model_instance = genai.GenerativeModel(model)
-            return model_instance.generate_content(prompt)
+            response = model_instance.generate_content(prompt)
+            print(f"--- Response from google/{model} ---\n{response.text}\n")
+        except Exception as e:
+            print(f"--- Error from google/{model} ---\nAn error occurred: {e}\n")
 
-        response = run_with_dynamic_captions(console, _call_google)
-        
-        # Check response for images
-        if hasattr(response, 'parts'):
-            for part in response.parts:
-                # Check for inline_data (common in newer Gemini SDKs for images)
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    if hasattr(part.inline_data, 'mime_type') and part.inline_data.mime_type.startswith('image/'):
-                        filepath = save_image(part.inline_data.data, 'google', prompt)
+    def generate_image(self, model, prompt):
+        console = Console()
+        try:
+            genai.configure(api_key=self.api_key)
+            
+            def _call_google():
+                model_instance = genai.GenerativeModel(model)
+                return model_instance.generate_content(prompt)
+
+            response = run_with_dynamic_captions(console, _call_google)
+            
+            # Check response for images
+            if hasattr(response, 'parts'):
+                for part in response.parts:
+                    # Check for inline_data (common in newer Gemini SDKs for images)
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        if hasattr(part.inline_data, 'mime_type') and part.inline_data.mime_type.startswith('image/'):
+                            filepath = save_image(part.inline_data.data, 'google', prompt)
+                            console.print(f"[bold green]Image generated successfully![/bold green]")
+                            console.print(f"Saved to: [bold]{filepath}[/bold]")
+                            return
+
+                    # Check for direct mime_type/blob (older/vertex SDKs sometimes)
+                    elif hasattr(part, 'mime_type') and part.mime_type.startswith('image/'):
+                        # It's an image!
+                        filepath = save_image(part.blob, 'google', prompt)
                         console.print(f"[bold green]Image generated successfully![/bold green]")
                         console.print(f"Saved to: [bold]{filepath}[/bold]")
                         return
+            
+            # Fallback/Placeholder
+            console.print(f"--- Response from google/{model} ---")
+            console.print("Raw response received. Could not automatically extract image.")
+            # Only print text if it looks like text, to avoid errors with inline_data
+            try:
+                 if response.text:
+                    console.print(response.text)
+            except Exception:
+                 console.print("[It seems the response contains non-text data that the CLI could not extract]")
 
-                # Check for direct mime_type/blob (older/vertex SDKs sometimes)
-                elif hasattr(part, 'mime_type') and part.mime_type.startswith('image/'):
-                    # It's an image!
-                    filepath = save_image(part.blob, 'google', prompt)
-                    console.print(f"[bold green]Image generated successfully![/bold green]")
-                    console.print(f"Saved to: [bold]{filepath}[/bold]")
-                    return
-        
-        # Fallback/Placeholder
-        console.print(f"--- Response from google/{model} ---")
-        console.print("Raw response received. Could not automatically extract image.")
-        # Only print text if it looks like text, to avoid errors with inline_data
+        except Exception as e:
+            console.print(f"[bold red]--- Error from google/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
+
+    def list_models(self):
         try:
-             if response.text:
-                console.print(response.text)
-        except Exception:
-             console.print("[It seems the response contains non-text data that the CLI could not extract]")
+            genai.configure(api_key=self.api_key)
+            print("--- Available models for google ---")
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    print(m.name)
+        except Exception as e:
+            print(f"--- Error listing google models ---\nAn error occurred: {e}\n")
 
-    except Exception as e:
-        console.print(f"[bold red]--- Error from google/{model} ---[/bold red]")
-        console.print(f"An error occurred: {e}\n")
-
-def generate_openai_image(api_key, model, prompt):
-    """Generates an image using OpenAI's DALL-E."""
-    console = Console()
-    try:
-        client = OpenAI(api_key=api_key)
-        
-        def _call_openai():
-            return client.images.generate(
+class OpenAICompatibleProvider(LLMProvider):
+    def generate_text(self, model, prompt):
+        try:
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
                 model=model,
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
             )
+            response_text = chat_completion.choices[0].message.content
+            print(f"--- Response from {self.provider_name}/{model} ---\n{response_text}\n")
+        except Exception as e:
+            print(f"--- Error from {self.provider_name}/{model} ---\nAn error occurred: {e}\n")
 
-        response = run_with_dynamic_captions(console, _call_openai)
-        
-        image_url = response.data[0].url
-        
-        # We can also wrap the download with a simpler spinner or just print
-        with Progress(SpinnerColumn(), TextColumn("[bold green]Downloading image..."), transient=True, console=console) as dl_progress:
-            dl_progress.add_task("Download", total=None)
-            image_data = download_image(image_url)
-        
-        filepath = save_image(image_data, 'openai', prompt, extension="png")
+    def list_models(self):
+        try:
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            models = client.models.list()
+            print(f"--- Available models for {self.provider_name} ---")
+            for model in sorted(models.data, key=lambda m: m.id):
+                print(model.id)
+        except Exception as e:
+            print(f"--- Error listing {self.provider_name} models ---\nAn error occurred: {e}\n")
+
+class OpenAIProvider(OpenAICompatibleProvider):
+    def __init__(self, api_key):
+        super().__init__(api_key, 'openai')
+
+    def generate_image(self, model, prompt):
+        console = Console()
+        try:
+            client = OpenAI(api_key=self.api_key)
             
-        console.print(f"[bold green]Image generated successfully![/bold green]")
-        console.print(f"Saved to: [bold]{filepath}[/bold]")
+            def _call_openai():
+                return client.images.generate(
+                    model=model,
+                    prompt=prompt,
+                    n=1,
+                    size="1024x1024"
+                )
+
+            response = run_with_dynamic_captions(console, _call_openai)
             
-    except Exception as e:
-        console.print(f"[bold red]--- Error from openai/{model} ---[/bold red]")
-        console.print(f"An error occurred: {e}\n")
+            image_url = response.data[0].url
+            
+            # We can also wrap the download with a simpler spinner or just print
+            with Progress(SpinnerColumn(), TextColumn("[bold green]Downloading image..."), transient=True, console=console) as dl_progress:
+                dl_progress.add_task("Download", total=None)
+                image_data = download_image(image_url)
+            
+            filepath = save_image(image_data, 'openai', prompt, extension="png")
+                
+            console.print(f"[bold green]Image generated successfully![/bold green]")
+            console.print(f"Saved to: [bold]{filepath}[/bold]")
+                
+        except Exception as e:
+            console.print(f"[bold red]--- Error from openai/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
+class AnthropicProvider(LLMProvider):
+    def __init__(self, api_key):
+        super().__init__(api_key, 'anthropic')
 
-def query_openai_compatible(api_key, model, prompt, provider_name, base_url=None):
-    """Sends a prompt to an OpenAI-compatible API."""
-    try:
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=model,
-        )
-        response_text = chat_completion.choices[0].message.content
-        print(f"--- Response from {provider_name}/{model} ---\n{response_text}\n")
-    except Exception as e:
-        print(f"--- Error from {provider_name}/{model} ---\nAn error occurred: {e}\n")
+    def generate_text(self, model, prompt):
+        try:
+            client = Anthropic(api_key=self.api_key)
+            message = client.messages.create(
+                model=model,
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            response_text = message.content[0].text
+            print(f"--- Response from anthropic/{model} ---\n{response_text}\n")
+        except Exception as e:
+            print(f"--- Error from anthropic/{model} ---\nAn error occurred: {e}\n")
 
-def query_anthropic(api_key, model, prompt):
-    """Sends a prompt to the Anthropic Claude API."""
-    try:
-        client = Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model=model,
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        response_text = message.content[0].text
-        print(f"--- Response from anthropic/{model} ---\n{response_text}\n")
-    except Exception as e:
-        print(f"--- Error from anthropic/{model} ---\nAn error occurred: {e}\n")
+    def list_models(self):
+        print("--- Available models for anthropic ---")
+        print("Note: Anthropic API does not support listing models. This is a curated list.")
+        print("claude-3-opus-20240229")
+        print("claude-3-sonnet-20240229")
+        print("claude-3-haiku-20240307")
 
-def query_alibaba(api_key, model, prompt):
-    """Sends a prompt to the Alibaba Qwen API (Dashscope)."""
-    try:
-        dashscope.api_key = api_key
-        response = dashscope.Generation.call(
-            model=model,
-            prompt=prompt
-        )
-        response_text = response.output.text
-        print(f"--- Response from alibaba/{model} ---\n{response_text}\n")
-    except Exception as e:
-        print(f"--- Error from alibaba/{model} ---\nAn error occurred: {e}\n")
+class AlibabaProvider(LLMProvider):
+    def __init__(self, api_key):
+        super().__init__(api_key, 'alibaba')
 
-# --- Model Listing Functions ---
-def list_google_models(api_key):
-    """Lists available models from the Google Gemini API."""
-    try:
-        genai.configure(api_key=api_key)
-        print("--- Available models for google ---")
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                print(m.name)
-    except Exception as e:
-        print(f"--- Error listing google models ---\nAn error occurred: {e}\n")
+    def generate_text(self, model, prompt):
+        try:
+            dashscope.api_key = self.api_key
+            response = dashscope.Generation.call(
+                model=model,
+                prompt=prompt
+            )
+            response_text = response.output.text
+            print(f"--- Response from alibaba/{model} ---\n{response_text}\n")
+        except Exception as e:
+            print(f"--- Error from alibaba/{model} ---\nAn error occurred: {e}\n")
 
-def list_openai_compatible_models(api_key, provider_name, base_url=None):
-    """Lists available models from an OpenAI-compatible API."""
-    try:
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        models = client.models.list()
-        print(f"--- Available models for {provider_name} ---")
-        for model in sorted(models.data, key=lambda m: m.id):
-            print(model.id)
-    except Exception as e:
-        print(f"--- Error listing {provider_name} models ---\nAn error occurred: {e}\n")
+    def list_models(self):
+        try:
+            dashscope.api_key = self.api_key
+            models = dashscope.Generation.list_models()
+            print("--- Available models for alibaba ---")
+            for model in sorted([m.id for m in models if m.id and 'qwen' in m.id]):
+                print(model)
+        except Exception as e:
+            print(f"--- Error listing alibaba models ---\nAn error occurred: {e}\n")
 
-def list_anthropic_models():
-    """Lists curated models for Anthropic, as their API doesn't support listing."""
-    print("--- Available models for anthropic ---")
-    print("Note: Anthropic API does not support listing models. This is a curated list.")
-    print("claude-3-opus-20240229")
-    print("claude-3-sonnet-20240229")
-    print("claude-3-haiku-20240307")
-
-def list_alibaba_models(api_key):
-    """Lists available models from the Alibaba Qwen API (Dashscope)."""
-    try:
-        dashscope.api_key = api_key
-        models = dashscope.Generation.list_models()
-        print("--- Available models for alibaba ---")
-        for model in sorted([m.id for m in models if m.id and 'qwen' in m.id]):
-            print(model)
-    except Exception as e:
-        print(f"--- Error listing alibaba models ---\nAn error occurred: {e}\n")
+class ProviderFactory:
+    @staticmethod
+    def get_provider(provider_name, api_key):
+        if provider_name == 'google':
+            return GoogleProvider(api_key)
+        elif provider_name == 'openai':
+            return OpenAIProvider(api_key)
+        elif provider_name == 'anthropic':
+            return AnthropicProvider(api_key)
+        elif provider_name == 'alibaba':
+            return AlibabaProvider(api_key)
+        elif provider_name == 'groq':
+            return OpenAICompatibleProvider(api_key, 'groq', 'https://api.groq.com/openai/v1')
+        elif provider_name == 'moonshot':
+            return OpenAICompatibleProvider(api_key, 'moonshot', 'https://api.moonshot.cn/v1')
+        else:
+            return None
 
 # --- Main Execution ---
 
@@ -331,95 +372,79 @@ def main():
 
     # --- Handle Model Listing ---
     if args.list_provider:
-        provider = args.list_provider
-        api_key, env_var_name = get_api_key(provider, config)
+        provider_name = args.list_provider
+        api_key, env_var_name = get_api_key(provider_name, config)
 
         if not env_var_name:
-             print(f"Error: Provider '{provider}' not found or 'api_key_env' not set in config.yaml.")
+             print(f"Error: Provider '{provider_name}' not found or 'api_key_env' not set in config.yaml.")
              return
 
-        if not api_key and provider != 'anthropic':
-            print(f"Error: API key for '{provider}' not found. Please set the '{env_var_name}' environment variable.")
+        # Special case: Anthropic listing doesn't require an API key
+        if not api_key and provider_name != 'anthropic':
+            print(f"Error: API key for '{provider_name}' not found. Please set the '{env_var_name}' environment variable.")
             return
 
-        if provider == 'google':
-            list_google_models(api_key)
-        elif provider == 'openai':
-            list_openai_compatible_models(api_key, 'openai')
-        elif provider == 'anthropic':
-            list_anthropic_models()
-        elif provider == 'groq':
-            list_openai_compatible_models(api_key, 'groq', 'https://api.groq.com/openai/v1')
-        elif provider == 'moonshot':
-            list_openai_compatible_models(api_key, 'moonshot', 'https://api.moonshot.cn/v1')
-        elif provider == 'alibaba':
-            list_alibaba_models(api_key)
+        provider = ProviderFactory.get_provider(provider_name, api_key)
+        if provider:
+            provider.list_models()
         else:
-            print(f"Error: Provider '{provider}' is not supported for listing models.")
+            print(f"Error: Provider '{provider_name}' is not supported for listing models.")
         return
 
     # --- Handle All Providers Query ---
     if args.all_providers:
-        # ... (This can be implemented similarly)
-        print("The --all-providers feature is not yet fully refactored.")
+        # This feature requires iterating over all config keys and creating providers
+        # Not fully refactored in this step as requested by "Refactor Provider Architecture" for main flow first.
+        print("The --all-providers feature is not yet fully refactored to use the new Provider classes.")
         return
 
     # --- Handle Image Generation ---
     if args.generate_image:
         # Default to OpenAI if no provider specified, or use specified provider
-        provider = args.provider if args.provider else 'openai'
+        provider_name = args.provider if args.provider else 'openai'
         # Default models
         model = args.model
         if not model:
-            if provider == 'openai':
+            if provider_name == 'openai':
                 model = 'dall-e-3'
-            elif provider == 'google':
+            elif provider_name == 'google':
                 model = 'gemini-3-pro-image-preview'
         
-        api_key, env_var_name = get_api_key(provider, config)
+        api_key, env_var_name = get_api_key(provider_name, config)
         
         if not env_var_name:
-             print(f"Error: Provider '{provider}' not found or 'api_key_env' not set in config.yaml.")
+             print(f"Error: Provider '{provider_name}' not found or 'api_key_env' not set in config.yaml.")
              return
 
         if not api_key:
-            print(f"Error: API key for '{provider}' not found. Please set the '{env_var_name}' environment variable.")
+            print(f"Error: API key for '{provider_name}' not found. Please set the '{env_var_name}' environment variable.")
             return
 
-        if provider == 'openai':
-            generate_openai_image(api_key, model, args.generate_image)
-        elif provider == 'google':
-            generate_google_image(api_key, model, args.generate_image)
+        provider = ProviderFactory.get_provider(provider_name, api_key)
+        if provider:
+            provider.generate_image(model, args.generate_image)
         else:
-            print(f"Error: Image generation not supported for provider '{provider}'.")
+            print(f"Error: Image generation not supported for provider '{provider_name}'.")
         return
 
     # --- Handle Standard Query ---
     if args.provider and args.model and args.prompt:
-        api_key, env_var_name = get_api_key(args.provider, config)
+        provider_name = args.provider
+        api_key, env_var_name = get_api_key(provider_name, config)
 
         if not env_var_name:
-             print(f"Error: Provider '{args.provider}' not found or 'api_key_env' not set in config.yaml.")
+             print(f"Error: Provider '{provider_name}' not found or 'api_key_env' not set in config.yaml.")
              return
 
         if not api_key:
-            print(f"Error: API key for '{args.provider}' not found. Please set the '{env_var_name}' environment variable.")
+            print(f"Error: API key for '{provider_name}' not found. Please set the '{env_var_name}' environment variable.")
             return
 
-        if args.provider == 'google':
-            query_google(api_key, args.model, args.prompt)
-        elif args.provider == 'openai':
-            query_openai_compatible(api_key, args.model, args.prompt, 'openai')
-        elif args.provider == 'anthropic':
-            query_anthropic(api_key, args.model, args.prompt)
-        elif args.provider == 'groq':
-            query_openai_compatible(api_key, args.model, args.prompt, 'groq', 'https://api.groq.com/openai/v1')
-        elif args.provider == 'moonshot':
-            query_openai_compatible(api_key, args.model, args.prompt, 'moonshot', 'https://api.moonshot.cn/v1')
-        elif args.provider == 'alibaba':
-            query_alibaba(api_key, args.model, args.prompt)
+        provider = ProviderFactory.get_provider(provider_name, api_key)
+        if provider:
+            provider.generate_text(args.model, args.prompt)
         else:
-            print(f"Error: Provider '{args.provider}' is not supported.")
+            print(f"Error: Provider '{provider_name}' is not supported.")
         return
 
     parser.print_help()
