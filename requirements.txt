@@ -6,3 +6,5 @@ groq
 dashscope
 rich
 requests
+pytest
+pytest-mock
