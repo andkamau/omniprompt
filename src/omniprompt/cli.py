@@ -49,19 +49,41 @@ FUN_CAPTIONS = [
 
 # --- Configuration ---
 
-def load_config(config_path='config.yaml'):
+def load_config(config_path=None):
     """
     Loads the non-sensitive configuration from a YAML file.
+    Searches in:
+    1. Provided path
+    2. ~/.config/omniprompt/config.yaml
+    3. ~/.omniprompt.yaml
+    4. ./config.yaml (fallback for local development)
     """
-    try:
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        print(f"Error: Configuration file '{config_path}' not found. Please ensure it exists.")
-        return None
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML file: {e}")
-        return None
+    paths_to_check = []
+    if config_path:
+        paths_to_check.append(Path(config_path))
+    
+    paths_to_check.extend([
+        Path.home() / ".config" / "omniprompt" / "config.yaml",
+        Path.home() / ".omniprompt.yaml",
+        Path("config.yaml")
+    ])
+
+    for path in paths_to_check:
+        if path.exists():
+            try:
+                with open(path, 'r') as f:
+                    return yaml.safe_load(f)
+            except yaml.YAMLError as e:
+                print(f"Error parsing YAML file '{path}': {e}")
+                return None
+            except Exception as e:
+                print(f"Error reading file '{path}': {e}")
+                return None
+    
+    print("Error: Configuration file not found. Checked:")
+    for p in paths_to_check:
+        print(f" - {p}")
+    return None
 
 def get_api_key(provider, config):
     """
@@ -236,7 +258,7 @@ class GoogleProvider(LLMProvider):
             # list_models returns an iterator of Model objects
             for m in client.models.list():
                  # We filter for models that support content generation
-                 if 'generateContent' in m.supported_generation_methods:
+                 if m.supported_actions and 'generateContent' in m.supported_actions:
                     console.print(f" - {m.name}")
         except Exception as e:
             console.print(f"[bold red]--- Error listing google models ---[/bold red]")
@@ -427,9 +449,7 @@ def setup_arg_parser():
 
 def main():
     """The main function to run the OmniPrompt CLI."""
-    script_dir = Path(__file__).parent
-    config_path = script_dir / 'config.yaml'
-    config = load_config(config_path)
+    config = load_config()
     if config is None:
         return
 

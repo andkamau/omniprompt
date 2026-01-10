@@ -13,60 +13,54 @@ OmniPrompt is a command-line utility for quickly testing and interacting with va
 
 ## Setup
 
-1.  **Clone the repository or download the files.**
-
-2.  **Install Dependencies:**
-    Navigate to the `omniprompt` directory and install the required Python packages into the virtual environment.
+1.  **Clone the repository:**
     ```bash
-    # First-time setup of the virtual environment
-    python3 -m venv env
-    source env/bin/activate
-    
-    # Install or update dependencies
-    pip install -r requirements.txt
+    git clone https://github.com/andkamau/omniprompt.git
+    cd omniprompt
     ```
+
+2.  **Install the package:**
+    You can install OmniPrompt in editable mode for development:
+    ```bash
+    pip install -e .
+    ```
+    This will install all dependencies and create the `omniprompt` command.
 
 3.  **Configure API Keys:**
-    OmniPrompt reads API keys from environment variables. The `config.yaml` file tells the script **which environment variable to read** for each provider.
+    OmniPrompt reads API keys from environment variables. It looks for a `config.yaml` file in the following locations:
+    -   `~/.config/omniprompt/config.yaml`
+    -   `~/.omniprompt.yaml`
+    -   The current directory (`./config.yaml`)
 
-    **Step 1: Find the Environment Variable Name**
-    Look inside `config.yaml` to find the `api_key_env` for the provider you want to use.
-    
-    *Example from `config.yaml`:*
-    ```yaml
-    openai:
-      api_key_env: "OPENAI_API_KEY"
-      api_key_url: "https://platform.openai.com/api-keys"
-    ```
-    This tells you the script will look for an environment variable named `OPENAI_API_KEY`.
+    **Step 1: Create your config file**
+    Copy the provided `config.yaml` to one of the locations above.
 
-    **Step 2: Set the Environment Variable**
-    In your shell, set the environment variable with your actual API key.
+    **Step 2: Set the Environment Variables**
+    Set the environment variables with your actual API keys as defined in your `config.yaml`.
 
     *Example:*
     ```bash
     export OPENAI_API_KEY="sk-..."
     export GOOGLE_API_KEY="AIza..."
     ```
-    To make these settings permanent, add the `export` lines to your shell's startup file (e.g., `~/.zshrc`, `~/.bash_profile`, or `~/.profile`).
 
 ## Usage
 
-All commands are run from the `omniprompt` directory using `python omniprompt.py`.
+Once installed, you can use the `omniprompt` command from anywhere.
 
 ### Basic Prompt
 ```bash
-python omniprompt.py -P openai -m gpt-4o -p "What are the three laws of thermodynamics?"
+omniprompt -P openai -m gpt-4o -p "What are the three laws of thermodynamics?"
 ```
 
 ### List Available Models
 ```bash
-python omniprompt.py -l google
+omniprompt -l google
 ```
 
 ### Image Generation
 ```bash
-python omniprompt.py -P google -i "A futuristic cityscape at sunset, digital art."
+omniprompt -P google -i "A futuristic cityscape at sunset, digital art."
 ```
 
 ### Test All Providers

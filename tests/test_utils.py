@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from omniprompt import save_image, get_fun_caption, FUN_CAPTIONS
+from omniprompt.cli import save_image, get_fun_caption, FUN_CAPTIONS
 
 def test_get_fun_caption():
     caption = get_fun_caption()
@@ -9,7 +9,7 @@ def test_get_fun_caption():
 
 def test_save_image(tmp_path, monkeypatch):
     # Patch the global GENERATED_IMAGES_DIR in the module to use the temp path
-    monkeypatch.setattr("omniprompt.GENERATED_IMAGES_DIR", tmp_path)
+    monkeypatch.setattr("omniprompt.cli.GENERATED_IMAGES_DIR", tmp_path)
     
     dummy_data = b"\x89PNG\r\n\x1a\n"
     provider = "test_provider"
