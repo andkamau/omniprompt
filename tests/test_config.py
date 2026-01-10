@@ -1,16 +1,16 @@
 import os
 import pytest
-from omniprompt.cli import load_config, get_api_key
+from omniprompt.cli import load_config, get_api_key, DEFAULT_CONFIG
 
 def test_load_config_success(mock_config_file, mock_config_data):
     config = load_config(str(mock_config_file))
     assert config == mock_config_data
 
 def test_load_config_not_found(mocker):
-    # Mock Path.exists to return False for all paths
+    # Mock Path.exists to always return False, ensuring no config is found
     mocker.patch("pathlib.Path.exists", return_value=False)
     config = load_config("non_existent_file.yaml")
-    assert config is None
+    assert config == DEFAULT_CONFIG
 
 def test_get_api_key_success(mock_config_data, monkeypatch):
     monkeypatch.setenv("TEST_GOOGLE_KEY", "secret-value")

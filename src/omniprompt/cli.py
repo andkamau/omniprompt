@@ -47,6 +47,33 @@ FUN_CAPTIONS = [
     "Polishing the pixels...",
 ]
 
+DEFAULT_CONFIG = {
+    'google': {
+        'api_key_env': 'GOOGLE_API_KEY',
+        'api_key_url': 'https://aistudio.google.com/app/apikey'
+    },
+    'openai': {
+        'api_key_env': 'OPENAI_API_KEY',
+        'api_key_url': 'https://platform.openai.com/api-keys'
+    },
+    'anthropic': {
+        'api_key_env': 'ANTHROPIC_API_KEY',
+        'api_key_url': 'https://console.anthropic.com/settings/keys'
+    },
+    'groq': {
+        'api_key_env': 'GROQ_API_KEY',
+        'api_key_url': 'https://console.groq.com/keys'
+    },
+    'moonshot': {
+        'api_key_env': 'MOONSHOT_API_KEY',
+        'api_key_url': 'https://platform.moonshot.cn/console/api-keys'
+    },
+    'alibaba': {
+        'api_key_env': 'ALIBABA_API_KEY',
+        'api_key_url': 'https://dashscope.console.aliyun.com/apiKey'
+    }
+}
+
 # --- Configuration ---
 
 def load_config(config_path=None):
@@ -80,10 +107,8 @@ def load_config(config_path=None):
                 print(f"Error reading file '{path}': {e}")
                 return None
     
-    print("Error: Configuration file not found. Checked:")
-    for p in paths_to_check:
-        print(f" - {p}")
-    return None
+    # Fallback to hardcoded defaults if no config file is found
+    return DEFAULT_CONFIG
 
 def get_api_key(provider, config):
     """
