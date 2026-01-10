@@ -28,6 +28,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
 from rich.text import Text
+from rich.markdown import Markdown
 
 # --- Constants ---
 GENERATED_IMAGES_DIR = Path("generated_images")
@@ -158,13 +159,26 @@ class GoogleProvider(LLMProvider):
         super().__init__(api_key, 'google')
 
     def generate_text(self, model, prompt):
+        console = Console()
         try:
             genai.configure(api_key=self.api_key)
             model_instance = genai.GenerativeModel(model)
-            response = model_instance.generate_content(prompt)
-            print(f"--- Response from google/{model} ---\n{response.text}\n")
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold blue]Thinking..."),
+                transient=True,
+                console=console
+            ) as progress:
+                progress.add_task("generate", total=None)
+                response = model_instance.generate_content(prompt)
+            
+            console.print(f"[bold blue]--- Response from google/{model} ---[/bold blue]")
+            console.print(Markdown(response.text))
+            console.print("\n")
         except Exception as e:
-            print(f"--- Error from google/{model} ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error from google/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
     def generate_image(self, model, prompt):
         console = Console()
@@ -211,37 +225,54 @@ class GoogleProvider(LLMProvider):
             console.print(f"An error occurred: {e}\n")
 
     def list_models(self):
+        console = Console()
         try:
             genai.configure(api_key=self.api_key)
-            print("--- Available models for google ---")
+            console.print("[bold blue]--- Available models for google ---[/bold blue]")
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods:
-                    print(m.name)
+                    console.print(f" - {m.name}")
         except Exception as e:
-            print(f"--- Error listing google models ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error listing google models ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
 class OpenAICompatibleProvider(LLMProvider):
     def generate_text(self, model, prompt):
+        console = Console()
         try:
             client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-            chat_completion = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model,
-            )
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold green]Thinking..."),
+                transient=True,
+                console=console
+            ) as progress:
+                progress.add_task("generate", total=None)
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=model,
+                )
+            
             response_text = chat_completion.choices[0].message.content
-            print(f"--- Response from {self.provider_name}/{model} ---\n{response_text}\n")
+            console.print(f"[bold green]--- Response from {self.provider_name}/{model} ---[/bold green]")
+            console.print(Markdown(response_text))
+            console.print("\n")
         except Exception as e:
-            print(f"--- Error from {self.provider_name}/{model} ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error from {self.provider_name}/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
     def list_models(self):
+        console = Console()
         try:
             client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             models = client.models.list()
-            print(f"--- Available models for {self.provider_name} ---")
+            console.print(f"[bold green]--- Available models for {self.provider_name} ---[/bold green]")
             for model in sorted(models.data, key=lambda m: m.id):
-                print(model.id)
+                console.print(f" - {model.id}")
         except Exception as e:
-            print(f"--- Error listing {self.provider_name} models ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error listing {self.provider_name} models ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
 class OpenAIProvider(OpenAICompatibleProvider):
     def __init__(self, api_key):
@@ -283,50 +314,79 @@ class AnthropicProvider(LLMProvider):
         super().__init__(api_key, 'anthropic')
 
     def generate_text(self, model, prompt):
+        console = Console()
         try:
             client = Anthropic(api_key=self.api_key)
-            message = client.messages.create(
-                model=model,
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold magenta]Thinking..."),
+                transient=True,
+                console=console
+            ) as progress:
+                progress.add_task("generate", total=None)
+                message = client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            
             response_text = message.content[0].text
-            print(f"--- Response from anthropic/{model} ---\n{response_text}\n")
+            console.print(f"[bold magenta]--- Response from anthropic/{model} ---[/bold magenta]")
+            console.print(Markdown(response_text))
+            console.print("\n")
         except Exception as e:
-            print(f"--- Error from anthropic/{model} ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error from anthropic/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
     def list_models(self):
-        print("--- Available models for anthropic ---")
-        print("Note: Anthropic API does not support listing models. This is a curated list.")
-        print("claude-3-opus-20240229")
-        print("claude-3-sonnet-20240229")
-        print("claude-3-haiku-20240307")
+        console = Console()
+        console.print("[bold magenta]--- Available models for anthropic ---[/bold magenta]")
+        console.print("[italic]Note: Anthropic API does not support listing models. This is a curated list.[/italic]")
+        console.print(" - claude-3-opus-20240229")
+        console.print(" - claude-3-sonnet-20240229")
+        console.print(" - claude-3-haiku-20240307")
 
 class AlibabaProvider(LLMProvider):
     def __init__(self, api_key):
         super().__init__(api_key, 'alibaba')
 
     def generate_text(self, model, prompt):
+        console = Console()
         try:
             dashscope.api_key = self.api_key
-            response = dashscope.Generation.call(
-                model=model,
-                prompt=prompt
-            )
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold yellow]Thinking..."),
+                transient=True,
+                console=console
+            ) as progress:
+                progress.add_task("generate", total=None)
+                response = dashscope.Generation.call(
+                    model=model,
+                    prompt=prompt
+                )
+            
             response_text = response.output.text
-            print(f"--- Response from alibaba/{model} ---\n{response_text}\n")
+            console.print(f"[bold yellow]--- Response from alibaba/{model} ---[/bold yellow]")
+            console.print(Markdown(response_text))
+            console.print("\n")
         except Exception as e:
-            print(f"--- Error from alibaba/{model} ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error from alibaba/{model} ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
     def list_models(self):
+        console = Console()
         try:
             dashscope.api_key = self.api_key
             models = dashscope.Generation.list_models()
-            print("--- Available models for alibaba ---")
+            console.print("[bold yellow]--- Available models for alibaba ---[/bold yellow]")
             for model in sorted([m.id for m in models if m.id and 'qwen' in m.id]):
-                print(model)
+                console.print(f" - {model}")
         except Exception as e:
-            print(f"--- Error listing alibaba models ---\nAn error occurred: {e}\n")
+            console.print(f"[bold red]--- Error listing alibaba models ---[/bold red]")
+            console.print(f"An error occurred: {e}\n")
 
 class ProviderFactory:
     @staticmethod
