@@ -1,80 +1,94 @@
 # OmniPrompt
 
-OmniPrompt is a command-line utility for quickly testing and interacting with various large language model (LLM) APIs from different providers. "Omni" reflects the tool's ability to connect to all different AI providers, and "Prompt" is the core action.
+OmniPrompt is a unified command-line interface (CLI) for interacting with various Large Language Model (LLM) providers. It simplifies testing prompts, listing models, and generating images across different AI services like Google Gemini, OpenAI, Anthropic Claude, and others.
 
-## Features
+## 🚀 Features
 
--   Test prompts against multiple AI providers from a single interface.
--   Support for major providers: Google, OpenAI, Anthropic, Groq, and more.
--   List available models for each provider.
--   Generate images using Google's Imagen model.
--   Run a single prompt against all configured providers simultaneously.
--   Secure and discoverable API key configuration using environment variables.
+*   **Unified Interface:** One command (`omniprompt`) to rule them all. Switch providers with a simple flag.
+*   **Multi-Provider Support:** First-class support for:
+    *   **Google** (Gemini & Imagen)
+    *   **OpenAI** (GPT & DALL-E)
+    *   **Anthropic** (Claude)
+    *   **Groq**
+    *   **Alibaba** (Qwen)
+    *   **Moonshot** (Kimi)
+*   **Image Generation:** Generate images directly from the CLI (supports Google Imagen & DALL-E 3).
+*   **Model Discovery:** Easily list available models for each provider.
+*   **Rich UI:** Beautiful Markdown rendering and progress spinners for a modern CLI experience.
+*   **Secure:** API keys are managed via environment variables, keeping your secrets safe.
 
-## Setup
+## 📦 Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/andkamau/omniprompt.git
-    cd omniprompt
-    ```
+Install OmniPrompt directly from PyPI:
 
-2.  **Install the package:**
-    You can install OmniPrompt in editable mode for development:
-    ```bash
-    pip install -e .
-    ```
-    This will install all dependencies and create the `omniprompt` command.
-
-3.  **Configure API Keys:**
-    OmniPrompt reads API keys from environment variables. It looks for a `config.yaml` file in the following locations:
-    -   `~/.config/omniprompt/config.yaml`
-    -   `~/.omniprompt.yaml`
-    -   The current directory (`./config.yaml`)
-
-    **Step 1: Create your config file**
-    Copy the provided `config.yaml` to one of the locations above.
-
-    **Step 2: Set the Environment Variables**
-    Set the environment variables with your actual API keys as defined in your `config.yaml`.
-
-    *Example:*
-    ```bash
-    export OPENAI_API_KEY="sk-..."
-    export GOOGLE_API_KEY="AIza..."
-    ```
-
-## Usage
-
-Once installed, you can use the `omniprompt` command from anywhere.
-
-### Basic Prompt
 ```bash
-omniprompt -P openai -m gpt-4o -p "What are the three laws of thermodynamics?"
+pip install omniprompt
 ```
 
-### List Available Models
+## 🔑 Configuration
+
+OmniPrompt relies on environment variables for authentication. You can set these in your shell session, add them to your `~/.bashrc` or `~/.zshrc`, or use a `.env` file manager.
+
+**Required Environment Variables:**
+
+| Provider | Environment Variable | Get Key |
+| :--- | :--- | :--- |
+| **Google** | `GOOGLE_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| **OpenAI** | `OPENAI_API_KEY` | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| **Anthropic** | `ANTHROPIC_API_KEY` | [Anthropic Console](https://console.anthropic.com/settings/keys) |
+| **Groq** | `GROQ_API_KEY` | [Groq Console](https://console.groq.com/keys) |
+| **Alibaba** | `ALIBABA_API_KEY` | [DashScope](https://dashscope.console.aliyun.com/apiKey) |
+| **Moonshot** | `MOONSHOT_API_KEY` | [Moonshot Platform](https://platform.moonshot.cn/console/api-keys) |
+
+*Note: You only need to set variables for the providers you intend to use.*
+
+## 💡 Usage
+
+### Basic Text Generation
+Send a prompt to a specific provider and model.
+
 ```bash
-omniprompt -l google
+# Ask Claude a question
+omniprompt --provider anthropic --model claude-3-haiku-20240307 --prompt "Describe a futuristic Nairobi where technology and nature coexist in harmony."
+
+# Ask GPT-4o
+omniprompt -P openai -m gpt-4o -p "Write a poem celebrating the resilience and beauty of the Serengeti."
 ```
 
 ### Image Generation
+Generate an image using DALL-E 3 (default for OpenAI) or Google Imagen.
+
 ```bash
-omniprompt -P google -i "A futuristic cityscape at sunset, digital art."
+# Generate with OpenAI (DALL-E 3)
+omniprompt --provider openai --generate-image "A masai warrior wearing vibranium armor in a high-tech Wakanda-style city"
+
+# Generate with Google (Imagen 3)
+omniprompt -P google -i "A majestic digital art portrait of an African queen with galaxy hair"
+```
+*Images are saved to the `generated_images/` directory in your current path.*
+
+### List Available Models
+See which models are available for a provider.
+
+```bash
+omniprompt --list-models google
 ```
 
-### Test All Providers
-```bash
-python omniprompt.py -a -p "Write a haiku about a robot learning to paint."
-```
+### Full Argument List
 
-### Arguments
+| Argument | Short | Description |
+| :--- | :--- | :--- |
+| `--provider` | `-P` | The API provider (e.g., `google`, `openai`, `anthropic`). |
+| `--model` | `-m` | The specific model ID to use. |
+| `--prompt` | `-p` | The text prompt to send to the model. |
+| `--generate-image` | `-i` | Prompt for image generation. |
+| `--list-models` | `-l` | List available models for the specified provider. |
+| `--help` | `-h` | Show the help message and exit. |
 
-| Full Argument      | Short Argument | Description                                           |
-| ------------------ | -------------- | ----------------------------------------------------- |
-| `--provider`       | `-P`           | The API provider (e.g., `google`, `openai`).          |
-| `--model`          | `-m`           | The specific model to use (e.g., `gpt-4o`).           |
-| `--prompt`         | `-p`           | The text prompt to send to the model.                 |
-| `--list-models`    | `-l`           | List available models for a given provider.           |
-| `--generate-image` | `-i`           | The prompt for image generation.                      |
-| `--all-providers`  | `-a`           | A flag to send a prompt to all configured providers.  |
+## 🤝 Contributing
+
+Contributions are welcome! Please check out our [GitHub repository](https://github.com/andkamau/omniprompt) to report issues or submit pull requests.
+
+## 📄 License
+
+This project is licensed under the **MIT License**.
