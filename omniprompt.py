@@ -17,7 +17,8 @@ from datetime import datetime
 from pathlib import Path
 
 # Import provider-specific libraries
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from openai import OpenAI
 from anthropic import Anthropic
 from groq import Groq
@@ -161,8 +162,7 @@ class GoogleProvider(LLMProvider):
     def generate_text(self, model, prompt):
         console = Console()
         try:
-            genai.configure(api_key=self.api_key)
-            model_instance = genai.GenerativeModel(model)
+            client = genai.Client(api_key=self.api_key)
             
             with Progress(
                 SpinnerColumn(),
@@ -171,7 +171,10 @@ class GoogleProvider(LLMProvider):
                 console=console
             ) as progress:
                 progress.add_task("generate", total=None)
-                response = model_instance.generate_content(prompt)
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
             
             console.print(f"[bold blue]--- Response from google/{model} ---[/bold blue]")
             console.print(Markdown(response.text))
@@ -183,37 +186,38 @@ class GoogleProvider(LLMProvider):
     def generate_image(self, model, prompt):
         console = Console()
         try:
-            genai.configure(api_key=self.api_key)
+            client = genai.Client(api_key=self.api_key)
             
             def _call_google():
-                model_instance = genai.GenerativeModel(model)
-                return model_instance.generate_content(prompt)
+                return client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
 
             response = run_with_dynamic_captions(console, _call_google)
             
             # Check response for images
-            if hasattr(response, 'parts'):
-                for part in response.parts:
-                    # Check for inline_data (common in newer Gemini SDKs for images)
-                    if hasattr(part, 'inline_data') and part.inline_data:
-                        if hasattr(part.inline_data, 'mime_type') and part.inline_data.mime_type.startswith('image/'):
-                            filepath = save_image(part.inline_data.data, 'google', prompt)
-                            console.print(f"[bold green]Image generated successfully![/bold green]")
-                            console.print(f"Saved to: [bold]{filepath}[/bold]")
-                            return
-
-                    # Check for direct mime_type/blob (older/vertex SDKs sometimes)
-                    elif hasattr(part, 'mime_type') and part.mime_type.startswith('image/'):
-                        # It's an image!
-                        filepath = save_image(part.blob, 'google', prompt)
-                        console.print(f"[bold green]Image generated successfully![/bold green]")
-                        console.print(f"Saved to: [bold]{filepath}[/bold]")
-                        return
+            # The new SDK response structure: response.candidates[0].content.parts[0].inline_data
+            if response.candidates:
+                for candidate in response.candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                             # Check for inline_data
+                            if part.inline_data:
+                                if part.inline_data.mime_type.startswith('image/'):
+                                    # Decode base64 if it's a string, or use bytes if it's bytes
+                                    image_data = part.inline_data.data
+                                    if isinstance(image_data, str):
+                                         image_data = base64.b64decode(image_data)
+                                    
+                                    filepath = save_image(image_data, 'google', prompt)
+                                    console.print(f"[bold green]Image generated successfully![/bold green]")
+                                    console.print(f"Saved to: [bold]{filepath}[/bold]")
+                                    return
             
             # Fallback/Placeholder
             console.print(f"--- Response from google/{model} ---")
             console.print("Raw response received. Could not automatically extract image.")
-            # Only print text if it looks like text, to avoid errors with inline_data
             try:
                  if response.text:
                     console.print(response.text)
@@ -227,10 +231,12 @@ class GoogleProvider(LLMProvider):
     def list_models(self):
         console = Console()
         try:
-            genai.configure(api_key=self.api_key)
+            client = genai.Client(api_key=self.api_key)
             console.print("[bold blue]--- Available models for google ---[/bold blue]")
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
+            # list_models returns an iterator of Model objects
+            for m in client.models.list():
+                 # We filter for models that support content generation
+                 if 'generateContent' in m.supported_generation_methods:
                     console.print(f" - {m.name}")
         except Exception as e:
             console.print(f"[bold red]--- Error listing google models ---[/bold red]")

@@ -1,3 +1,4 @@
 generated_images/
 TASKS.md
 .venv-omniprompt/
+__pycache__/

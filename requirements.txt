@@ -1,6 +1,13 @@
 PyYAML
-google-generativeai
+google-genai
 openai
+anthropic
+groq
+dashscope
+rich
+requests
+pytest
+pytest-mock
 anthropic
 groq
 dashscope
