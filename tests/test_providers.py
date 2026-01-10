@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
-from omniprompt.cli import (
+from omniprompt.providers import (
     ProviderFactory, GoogleProvider, OpenAIProvider, AnthropicProvider, 
     AlibabaProvider, OpenAICompatibleProvider
 )
@@ -24,7 +24,7 @@ def test_provider_factory_invalid():
 # --- Google Provider Tests ---
 
 def test_google_generate_text(mocker, capsys):
-    mock_genai_module = mocker.patch("omniprompt.cli.genai")
+    mock_genai_module = mocker.patch("omniprompt.providers.genai")
     mock_client_cls = mock_genai_module.Client
     mock_client_instance = mock_client_cls.return_value
     
@@ -45,7 +45,7 @@ def test_google_generate_text(mocker, capsys):
     assert "Google response" in captured.out
 
 def test_google_list_models(mocker, capsys):
-    mock_genai_module = mocker.patch("omniprompt.cli.genai")
+    mock_genai_module = mocker.patch("omniprompt.providers.genai")
     mock_client_instance = mock_genai_module.Client.return_value
     
     model1 = MagicMock()
@@ -66,12 +66,12 @@ def test_google_list_models(mocker, capsys):
     assert "models/embedding-001" not in captured.out
 
 def test_google_generate_image_mock(mocker, capsys):
-    mock_run = mocker.patch("omniprompt.cli.run_with_dynamic_captions")
+    mock_run = mocker.patch("omniprompt.providers.run_with_dynamic_captions")
     def side_effect(console, action, *args, **kwargs):
         return action()
     mock_run.side_effect = side_effect
 
-    mock_genai_module = mocker.patch("omniprompt.cli.genai")
+    mock_genai_module = mocker.patch("omniprompt.providers.genai")
     mock_client_instance = mock_genai_module.Client.return_value
 
     mock_response = MagicMock()
@@ -83,9 +83,9 @@ def test_google_generate_image_mock(mocker, capsys):
     mock_response.candidates = [mock_candidate]
     mock_client_instance.models.generate_content.return_value = mock_response
 
-    mock_save_image = mocker.patch("omniprompt.cli.save_image")
+    mock_save_image = mocker.patch("omniprompt.providers.save_image")
     mock_save_image.return_value = Path("generated_images/test.png")
-    mocker.patch("omniprompt.cli.Console")
+    mocker.patch("omniprompt.providers.Console")
 
     provider = GoogleProvider("test_key")
     provider.generate_image("imagen-3", "draw a cat")
@@ -95,7 +95,7 @@ def test_google_generate_image_mock(mocker, capsys):
 # --- OpenAI Provider Tests ---
 
 def test_openai_generate_text(mocker, capsys):
-    mock_openai_class = mocker.patch("omniprompt.cli.OpenAI")
+    mock_openai_class = mocker.patch("omniprompt.providers.OpenAI")
     mock_client = mock_openai_class.return_value
     
     mock_completion = MagicMock()
@@ -104,7 +104,7 @@ def test_openai_generate_text(mocker, capsys):
     mock_completion.choices = [MagicMock(message=mock_message)]
     
     mock_client.chat.completions.create.return_value = mock_completion
-    mock_console_cls = mocker.patch("omniprompt.cli.Console")
+    mock_console_cls = mocker.patch("omniprompt.providers.Console")
     mock_console_instance = mock_console_cls.return_value
 
     provider = OpenAIProvider("test_key")
@@ -112,9 +112,6 @@ def test_openai_generate_text(mocker, capsys):
 
     mock_client.chat.completions.create.assert_called_once()
     
-    # Check that console.print was called with expected strings
-    # We can't check the exact markdown object easily, but we can check the header
-    # and ensure multiple calls happened.
     calls = mock_console_instance.print.call_args_list
     assert any("Response from openai/gpt-4" in str(call) for call in calls)
 

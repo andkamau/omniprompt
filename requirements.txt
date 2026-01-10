@@ -6,12 +6,3 @@ groq
 dashscope
 rich
 requests
-pytest
-pytest-mock
-anthropic
-groq
-dashscope
-rich
-requests
-pytest
-pytest-mock

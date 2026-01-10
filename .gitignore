@@ -2,3 +2,6 @@ generated_images/
 TASKS.md
 .venv-omniprompt/
 __pycache__/
+dist/
+build/
+*.egg-info/
