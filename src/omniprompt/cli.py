@@ -44,6 +44,14 @@ DEFAULT_CONFIG = {
     }
 }
 
+POLISH_STYLES = {
+    'friendly': "Rephrase the following text in a friendly, approachable tone:",
+    'professional': "Rephrase the following into a professional, clear, and concise email/message:",
+    'concise': "Make the following text more concise without losing key information:",
+    'academic': "Rephrase the following in an academic and formal tone:",
+    'bullet': "Summarize the following into a clear bulleted list:",
+}
+
 # --- Configuration ---
 
 def load_config(config_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -111,6 +119,8 @@ def setup_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("-m", "--model", help="The specific model to use.")
     parser.add_argument("-p", "--prompt", help="The text prompt to send to the model.")
     parser.add_argument("-i", "--generate-image", help="The prompt for image generation.")
+    parser.add_argument("-s", "--style", choices=POLISH_STYLES.keys(), help="Pre-canned polishing style to apply.")
+    parser.add_argument("--polish", help="Custom polishing instruction to prepend to the prompt.")
     parser.add_argument("-a", "--all-providers", action="store_true", help="Send a prompt to all configured providers.")
     parser.add_argument("-l", "--list-models", dest="list_provider", help="List available models for a given provider.")
     return parser
@@ -178,8 +188,18 @@ def main():
         return
 
     # --- Handle Standard Query ---
-    if args.provider and args.model and args.prompt:
-        provider_name = args.provider
+    if args.prompt:
+        # Prepend polishing instructions if requested
+        if args.style:
+            instruction = POLISH_STYLES[args.style]
+            args.prompt = f"{instruction}\n\n{args.prompt}"
+        elif args.polish:
+            args.prompt = f"{args.polish}\n\n{args.prompt}"
+
+        # Use defaults if not specified
+        provider_name = args.provider if args.provider else 'google'
+        model = args.model if args.model else 'gemini-1.5-flash'
+        
         api_key, env_var_name = get_api_key(provider_name, config)
 
         if not env_var_name:
@@ -192,7 +212,7 @@ def main():
 
         provider = ProviderFactory.get_provider(provider_name, api_key)
         if provider:
-            provider.generate_text(args.model, args.prompt)
+            provider.generate_text(model, args.prompt)
         else:
             print(f"Error: Provider '{provider_name}' is not supported.")
         return

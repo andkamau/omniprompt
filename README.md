@@ -14,6 +14,7 @@ OmniPrompt is a unified command-line interface (CLI) for interacting with variou
     *   **Moonshot** (Kimi)
 *   **Image Generation:** Generate images directly from the CLI (supports Google Imagen & DALL-E 3).
 *   **Model Discovery:** Easily list available models for each provider.
+*   **Text Polishing:** Native support for rephrasing text in various styles (e.g., professional, friendly, concise).
 *   **Rich UI:** Beautiful Markdown rendering and progress spinners for a modern CLI experience.
 *   **Secure:** API keys are managed via environment variables, keeping your secrets safe.
 
@@ -55,6 +56,20 @@ omniprompt --provider anthropic --model claude-3-haiku-20240307 --prompt "Descri
 omniprompt -P openai -m gpt-4o -p "Write a poem celebrating the resilience and beauty of the Serengeti."
 ```
 
+### Text Polishing & Rephrasing
+Refine your drafts using pre-canned styles or custom instructions.
+
+```bash
+# Rephrase a draft as a professional email (uses Google/Gemini by default)
+omniprompt --style professional --prompt "hey i'm gonna be late for the meeting"
+
+# Make a text more friendly
+omniprompt -s friendly -p "The project is delayed."
+
+# Apply a custom polishing instruction
+omniprompt --polish "Rephrase this as a Shakespearian sonnet:" -p "I really like eating pizza on Fridays."
+```
+
 ### Image Generation
 Generate an image using DALL-E 3 (default for OpenAI) or Google Imagen.
 
@@ -81,6 +96,8 @@ omniprompt --list-models google
 | `--provider` | `-P` | The API provider (e.g., `google`, `openai`, `anthropic`). |
 | `--model` | `-m` | The specific model ID to use. |
 | `--prompt` | `-p` | The text prompt to send to the model. |
+| `--style` | `-s` | Pre-canned polishing style (`friendly`, `professional`, `concise`, `academic`, `bullet`). |
+| `--polish` | | Custom polishing instruction to prepend to the prompt. |
 | `--generate-image` | `-i` | Prompt for image generation. |
 | `--list-models` | `-l` | List available models for the specified provider. |
 | `--help` | `-h` | Show the help message and exit. |
