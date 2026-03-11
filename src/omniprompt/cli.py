@@ -8,8 +8,35 @@ large language model (LLM) APIs from different providers.
 import argparse
 import yaml
 import os
+import warnings
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Tuple, Any
+
+# --- Suppress Warnings and Noise ---
+
+# Suppress Python 3.9 EOL and other library-specific warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.*")
+warnings.filterwarnings("ignore", message=".*Python version 3\.9 past its end of life.*")
+
+# Suppress Pydantic deprecation warnings from google-genai
+try:
+    from pydantic import PydanticDeprecatedSince212
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
+except ImportError:
+    pass
+
+# Suppress urllib3 NotOpenSSLWarning
+try:
+    from urllib3.exceptions import NotOpenSSLWarning
+    warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
+except ImportError:
+    pass
+
+# Set library loggers to ERROR to suppress INFO/WARNING messages (like API key selection)
+logging.getLogger("google").setLevel(logging.ERROR)
+logging.getLogger("google_genai").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 # Local imports
 from .providers import ProviderFactory

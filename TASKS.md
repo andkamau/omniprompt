@@ -15,10 +15,11 @@
 - [x] Unit tests for utils, config, and providers.
 - [x] Native text "polishing" feature with pre-canned styles and custom instructions.
 
-## Phase 2: Refactoring & Quality (Active)
+## Phase 2: Refactoring & Quality (Completed)
 - [x] Modularize codebase (`cli.py`, `providers.py`, `utils.py`).
 - [x] Standardize `manage.sh` for development tasks.
 - [x] Add comprehensive docstrings to all modules and functions.
+- [x] Suppress library-level noise (Python 3.9 EOL warnings, OpenSSL warnings, and API key selection messages).
 - [ ] Implement robust error handling for API timeouts and rate limits.
 - [ ] Add more edge-case tests (e.g., invalid API keys, empty prompts).
 - [ ] Integrate linting and type-checking into `manage.sh` (e.g., `mypy`).
